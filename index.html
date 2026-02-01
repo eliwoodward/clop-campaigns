@@ -1,135 +1,339 @@
----
-layout: none
----
-{% raw %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>MFT Exploits Sankey</title>
+  <title>MFT Exploits Sankey | Analytical View</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <style>
     :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
     body {
       margin: 0; padding: 0; background: #0b0f14; color: #e5e7eb;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh; display: flex; flex-direction: column;
     }
+    
+    /* Header */
     header {
-      padding: 18px 24px; background: linear-gradient(90deg,#0b0f14,#121926,#0b0f14);
-      border-bottom: 1px solid #111827;
-      position: sticky; top: 0; z-index: 9;
+      padding: 15px 24px; background: #121926;
+      border-bottom: 1px solid #1f2937;
+      flex-shrink: 0;
+      display: flex; justify-content: space-between; align-items: center;
     }
-    h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
-    .sub { opacity:.8; font-size: 13px; margin-top:4px }
-    #controls {
-      display:flex; gap:12px; align-items:center; padding:12px 24px; flex-wrap:wrap;
-      background:#0d121a; border-bottom:1px solid #111827;
+    h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: .5px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:4px; background:#0e7490; margin-left:8px; font-size:11px; font-weight:bold;}
+    
+    /* Main Layout */
+    #container { display: flex; flex: 1; overflow: hidden; }
+    
+    /* Sidebar */
+    #sidebar {
+      width: 320px; background: #0d121a; border-right: 1px solid #1f2937;
+      display: flex; flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
     }
-    select, button {
-      background:#111827; color:#e5e7eb; border:1px solid #1f2937; border-radius:10px; padding:8px 10px;
-      font-size:14px;
+    .control-group { padding: 16px; border-bottom: 1px solid #1f2937; }
+    .control-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .control-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #9ca3af; }
+    
+    /* Inputs */
+    input[type="text"] {
+      width: 100%; background: #1f2937; border: 1px solid #374151; color: #fff;
+      padding: 6px 10px; border-radius: 6px; font-size: 13px; margin-bottom: 8px;
     }
-    button:hover, select:hover { border-color:#374151; }
-    #chart { width:100%; height: calc(100vh - 150px); }
-    footer { padding:10px 16px; font-size:12px; opacity:.7 }
-    .pill {
-      display:inline-block; padding:2px 8px; border-radius:999px; background:#0e7490; margin-left:8px; font-size:12px;
+    input[type="text"]:focus { outline: none; border-color: #3b82f6; }
+    
+    /* Checkbox Lists */
+    .list-container {
+      max-height: 200px; overflow-y: auto;
+      background: #111827; border: 1px solid #1f2937; border-radius: 6px;
+      padding: 4px;
     }
+    .list-item {
+      display: flex; align-items: center; padding: 4px 8px; font-size: 13px;
+      cursor: pointer; border-radius: 4px;
+    }
+    .list-item:hover { background: #1f2937; }
+    .list-item input { margin-right: 8px; accent-color: #0ea5e9; }
+    .list-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Buttons */
+    .btn-xs { font-size: 10px; background: #374151; border: none; color: #fff; padding: 2px 6px; border-radius: 3px; cursor: pointer; }
+    .btn-xs:hover { background: #4b5563; }
+    
+    /* Chart Area */
+    #main { flex: 1; position: relative; padding: 0; display:flex; flex-direction:column; }
+    #stats-bar {
+      padding: 8px 16px; font-size: 12px; color: #9ca3af; border-bottom: 1px solid #1f2937;
+      background: #0b0f14;
+    }
+    #chart { flex: 1; width: 100%; }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0d121a; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>MFT Exploits · Interactive Sankey <span class="pill">Campaign → ASN → Country</span></h1>
-    <div class="sub">Use the dropdown to focus by campaign. Drag to pan, scroll to zoom. Hover for counts.</div>
-  </header>
-  <div id="controls">
-    <label for="campaign">Filter:</label>
-    <select id="campaign"></select>
-    <button id="reset">Reset View</button>
-    <div style="opacity:.7;font-size:12px">Links shown: <span id="linkCount">–</span></div>
+
+<header>
+  <div>
+    <h1>MFT Exploits Analyzer <span class="pill">Interactive</span></h1>
   </div>
-  <div id="chart"></div>
-  <footer>Built with Plotly.js. Save this file anywhere (e.g., GitHub Pages) and open in a browser.</footer>
+  <div style="font-size:12px; opacity:0.7">Sankey Diagram</div>
+</header>
+
+<div id="container">
+  <div id="sidebar">
+    
+    <div class="control-group">
+      <div class="control-header">
+        <span class="control-title">Campaigns</span>
+        <div>
+          <button class="btn-xs" onclick="toggleAll('campaign', true)">All</button>
+          <button class="btn-xs" onclick="toggleAll('campaign', false)">None</button>
+        </div>
+      </div>
+      <input type="text" id="search-campaign" placeholder="Search campaigns..." onkeyup="filterList('campaign')">
+      <div class="list-container" id="list-campaign"></div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-header">
+        <span class="control-title">ASNs</span>
+        <div>
+          <button class="btn-xs" onclick="toggleAll('asn', true)">All</button>
+          <button class="btn-xs" onclick="toggleAll('asn', false)">None</button>
+        </div>
+      </div>
+      <input type="text" id="search-asn" placeholder="Search ASNs..." onkeyup="filterList('asn')">
+      <div class="list-container" id="list-asn" style="max-height: 300px;"></div>
+    </div>
+    
+    <div class="control-group" style="text-align: center;">
+      <button class="btn-xs" style="padding: 8px 16px; font-size: 12px;" onclick="resetView()">Reset Zoom & Pan</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="stats-bar">
+      Showing <strong id="link-count" style="color:#fff">0</strong> flows based on current filters. 
+      <span id="filter-status"></span>
+    </div>
+    <div id="chart"></div>
+  </div>
+</div>
+
 <script>
-const campaigns = ["All", "Accellion File Transfer Appliance (FTA)", "SolarWinds Serv-U", "Fortra GoAnywhere MFT", "PaperCut MF/NG", "Progress MOVEit Transfer", "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)", "Oracle E-Business Suite"];
+// --- DATA DEFINITIONS ---
+// Indices: 0-6 (Campaigns), 7-79 (ASNs), 80+ (Countries) based on provided data structure
+const campaignsList = ["Accellion File Transfer Appliance (FTA)", "SolarWinds Serv-U", "Fortra GoAnywhere MFT", "PaperCut MF/NG", "Progress MOVEit Transfer", "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)", "Oracle E-Business Suite"];
+
 const nodes = ["Accellion File Transfer Appliance (FTA)", "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)", "Fortra GoAnywhere MFT", "Oracle E-Business Suite", "PaperCut MF/NG", "Progress MOVEit Transfer", "SolarWinds Serv-U", "AS-COLOCROSSING", "CROWNCLOUD", "GHOST", "Hostzealot", "TIER-NET", "WORLDSTREAM", "ALEXHOST", "BALTNETA Customers AS", "BOGRAINFOCOM-AS-AP BograInfo.com", "CONTABO", "DATAHOME S.A.", "DIGITALOCEAN-ASN", "HOSTING-SOLUTIONS", "HOSTWINDS", "INOVARE-AS str. Uzinelor 21 of. 37", "INT-NETWORK", "SCALAXY-AS", "SERVER-MANIA", "SERVERASTRA-AS", "UNIFIEDLAYER-AS-1", "AMAZON-02", "AS-ALVIVA", "BANDWIDTH-AS", "BT-UK-AS BTnet UK Regional network", "CLOUDFLARENET", "COMCAST-7922", "DATACAMPUS", "FDCSERVERS", "GREENFLOID-AS", "HORMELFOODS", "HOSTROYALE", "I-LAN-AS", "ITLDC-EU", "M247", "MICROSOFT-CORP-MSN-AS-BLOCK", "OVH", "PANDG", "SOLLUTIUM-NL", "THCPROJECTS", "THE-HOSTING", "TIF-AS Iliad Italia S.p.A", "TWC-10796-MIDWEST", "TWC-11426-CAROLINAS", "VNPT-AS-VN VNPT Corp", "XMISSION", "ASNET", "CHIESI-AS", "GIGAHOST", "HETZNER-AS", "RELIABLESITE", "AS-GLOBALTELEHOST", "HEXTET", "Host-Africa-AS", "KREZ999AS", "NETWAVE-AS-AP", "NOVOSERVE-AS", "SHARP-ASN", "SS-NET", "CLOUVIDER Clouvider - Global ASN", "DELTAHOST-AS", "DELTAHOST-KYIV", "FLYSERVERS-ASN", "GLOBALCOMPASS", "GLOBALLAYER", "HOSTKEY-AS", "LAYER7-NETWORKS-", "SONICASN", "YURTEH-AS", "ACI-1", "ASN-CXA-ALL-CCI-22773-RDC", "IT7NET", "TWC-11427-TEXAS", "VIANET INC 5690", "Unknown", "AU", "LU", "BG", "US", "NL", "MD", "LT", "BD", "DE", "PA", "SC", "LV", "CA", "HU", "GB", "HK", "IN", "UA", "RO", "FR", "PL", "VN", "IT", "NO", "ZA", "LB"];
+
 const linksAll = [{"source": 0, "target": 7, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 AS-COLOCROSSING", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 7, "target": 80, "value": 1, "label": "AS-COLOCROSSING \u2192 Unknown", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 0, "target": 8, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 CROWNCLOUD", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 8, "target": 81, "value": 1, "label": "CROWNCLOUD \u2192 AU", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 0, "target": 9, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 GHOST", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 9, "target": 82, "value": 1, "label": "GHOST \u2192 LU", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 0, "target": 10, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 Hostzealot", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 10, "target": 83, "value": 1, "label": "Hostzealot \u2192 BG", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 0, "target": 11, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 TIER-NET", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 11, "target": 84, "value": 1, "label": "TIER-NET \u2192 US", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 0, "target": 12, "value": 1, "label": "Accellion File Transfer Appliance (FTA) \u2192 WORLDSTREAM", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 12, "target": 85, "value": 1, "label": "WORLDSTREAM \u2192 NL", "group": "Accellion File Transfer Appliance (FTA)"}, {"source": 1, "target": 13, "value": 3, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 ALEXHOST", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 13, "target": 86, "value": 3, "label": "ALEXHOST \u2192 MD", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 14, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 BALTNETA Customers AS", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 14, "target": 87, "value": 1, "label": "BALTNETA Customers AS \u2192 LT", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 15, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 BOGRAINFOCOM-AS-AP BograInfo.com", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 15, "target": 88, "value": 1, "label": "BOGRAINFOCOM-AS-AP BograInfo.com \u2192 BD", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 16, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 CONTABO", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 16, "target": 89, "value": 1, "label": "CONTABO \u2192 DE", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 17, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 DATAHOME S.A.", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 17, "target": 90, "value": 1, "label": "DATAHOME S.A. \u2192 PA", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 18, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 DIGITALOCEAN-ASN", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 18, "target": 84, "value": 1, "label": "DIGITALOCEAN-ASN \u2192 US", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 19, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 HOSTING-SOLUTIONS", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 19, "target": 84, "value": 1, "label": "HOSTING-SOLUTIONS \u2192 US", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 20, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 HOSTWINDS", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 20, "target": 84, "value": 1, "label": "HOSTWINDS \u2192 US", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 10, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 Hostzealot", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 10, "target": 83, "value": 1, "label": "Hostzealot \u2192 BG", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 21, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 INOVARE-AS str. Uzinelor 21 of. 37", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 21, "target": 86, "value": 1, "label": "INOVARE-AS str. Uzinelor 21 of. 37 \u2192 MD", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 22, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 INT-NETWORK", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 22, "target": 91, "value": 1, "label": "INT-NETWORK \u2192 SC", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 23, "value": 2, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 SCALAXY-AS", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 23, "target": 92, "value": 2, "label": "SCALAXY-AS \u2192 LV", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 24, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 SERVER-MANIA", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 24, "target": 93, "value": 1, "label": "SERVER-MANIA \u2192 CA", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 25, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 SERVERASTRA-AS", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 25, "target": 94, "value": 1, "label": "SERVERASTRA-AS \u2192 HU", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 1, "target": 26, "value": 1, "label": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom) \u2192 UNIFIEDLAYER-AS-1", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 26, "target": 84, "value": 1, "label": "UNIFIEDLAYER-AS-1 \u2192 US", "group": "Cleo MFT Solutions (Harmony, VLTrader, LexiCom)"}, {"source": 2, "target": 27, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 AMAZON-02", "group": "Fortra GoAnywhere MFT"}, {"source": 27, "target": 84, "value": 1, "label": "AMAZON-02 \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 28, "value": 2, "label": "Fortra GoAnywhere MFT \u2192 AS-ALVIVA", "group": "Fortra GoAnywhere MFT"}, {"source": 28, "target": 91, "value": 2, "label": "AS-ALVIVA \u2192 SC", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 7, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 AS-COLOCROSSING", "group": "Fortra GoAnywhere MFT"}, {"source": 7, "target": 84, "value": 1, "label": "AS-COLOCROSSING \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 29, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 BANDWIDTH-AS", "group": "Fortra GoAnywhere MFT"}, {"source": 29, "target": 95, "value": 1, "label": "BANDWIDTH-AS \u2192 GB", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 30, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 BT-UK-AS BTnet UK Regional network", "group": "Fortra GoAnywhere MFT"}, {"source": 30, "target": 95, "value": 1, "label": "BT-UK-AS BTnet UK Regional network \u2192 GB", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 31, "value": 4, "label": "Fortra GoAnywhere MFT \u2192 CLOUDFLARENET", "group": "Fortra GoAnywhere MFT"}, {"source": 31, "target": 84, "value": 4, "label": "CLOUDFLARENET \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 32, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 COMCAST-7922", "group": "Fortra GoAnywhere MFT"}, {"source": 32, "target": 84, "value": 1, "label": "COMCAST-7922 \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 33, "value": 3, "label": "Fortra GoAnywhere MFT \u2192 DATACAMPUS", "group": "Fortra GoAnywhere MFT"}, {"source": 33, "target": 96, "value": 3, "label": "DATACAMPUS \u2192 HK", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 17, "value": 3, "label": "Fortra GoAnywhere MFT \u2192 DATAHOME S.A.", "group": "Fortra GoAnywhere MFT"}, {"source": 17, "target": 90, "value": 3, "label": "DATAHOME S.A. \u2192 PA", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 18, "value": 2, "label": "Fortra GoAnywhere MFT \u2192 DIGITALOCEAN-ASN", "group": "Fortra GoAnywhere MFT"}, {"source": 18, "target": 84, "value": 2, "label": "DIGITALOCEAN-ASN \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 34, "value": 3, "label": "Fortra GoAnywhere MFT \u2192 FDCSERVERS", "group": "Fortra GoAnywhere MFT"}, {"source": 34, "target": 84, "value": 3, "label": "FDCSERVERS \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 9, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 GHOST", "group": "Fortra GoAnywhere MFT"}, {"source": 9, "target": 82, "value": 1, "label": "GHOST \u2192 LU", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 35, "value": 2, "label": "Fortra GoAnywhere MFT \u2192 GREENFLOID-AS", "group": "Fortra GoAnywhere MFT"}, {"source": 35, "target": 84, "value": 2, "label": "GREENFLOID-AS \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 36, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 HORMELFOODS", "group": "Fortra GoAnywhere MFT"}, {"source": 36, "target": 84, "value": 1, "label": "HORMELFOODS \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 37, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 HOSTROYALE", "group": "Fortra GoAnywhere MFT"}, {"source": 37, "target": 97, "value": 1, "label": "HOSTROYALE \u2192 IN", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 10, "value": 11, "label": "Fortra GoAnywhere MFT \u2192 Hostzealot", "group": "Fortra GoAnywhere MFT"}, {"source": 10, "target": 83, "value": 11, "label": "Hostzealot \u2192 BG", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 38, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 I-LAN-AS", "group": "Fortra GoAnywhere MFT"}, {"source": 38, "target": 98, "value": 1, "label": "I-LAN-AS \u2192 UA", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 39, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 ITLDC-EU", "group": "Fortra GoAnywhere MFT"}, {"source": 39, "target": 84, "value": 1, "label": "ITLDC-EU \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 40, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 M247", "group": "Fortra GoAnywhere MFT"}, {"source": 40, "target": 99, "value": 1, "label": "M247 \u2192 RO", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 41, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 MICROSOFT-CORP-MSN-AS-BLOCK", "group": "Fortra GoAnywhere MFT"}, {"source": 41, "target": 84, "value": 1, "label": "MICROSOFT-CORP-MSN-AS-BLOCK \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 42, "value": 4, "label": "Fortra GoAnywhere MFT \u2192 OVH", "group": "Fortra GoAnywhere MFT"}, {"source": 42, "target": 100, "value": 4, "label": "OVH \u2192 FR", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 43, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 PANDG", "group": "Fortra GoAnywhere MFT"}, {"source": 43, "target": 84, "value": 1, "label": "PANDG \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 44, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 SOLLUTIUM-NL", "group": "Fortra GoAnywhere MFT"}, {"source": 44, "target": 101, "value": 1, "label": "SOLLUTIUM-NL \u2192 PL", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 45, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 THCPROJECTS", "group": "Fortra GoAnywhere MFT"}, {"source": 45, "target": 99, "value": 1, "label": "THCPROJECTS \u2192 RO", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 46, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 THE-HOSTING", "group": "Fortra GoAnywhere MFT"}, {"source": 46, "target": 86, "value": 1, "label": "THE-HOSTING \u2192 MD", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 47, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 TIF-AS Iliad Italia S.p.A", "group": "Fortra GoAnywhere MFT"}, {"source": 47, "target": 100, "value": 1, "label": "TIF-AS Iliad Italia S.p.A \u2192 FR", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 48, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 TWC-10796-MIDWEST", "group": "Fortra GoAnywhere MFT"}, {"source": 48, "target": 84, "value": 1, "label": "TWC-10796-MIDWEST \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 49, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 TWC-11426-CAROLINAS", "group": "Fortra GoAnywhere MFT"}, {"source": 49, "target": 84, "value": 1, "label": "TWC-11426-CAROLINAS \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 50, "value": 2, "label": "Fortra GoAnywhere MFT \u2192 VNPT-AS-VN VNPT Corp", "group": "Fortra GoAnywhere MFT"}, {"source": 50, "target": 102, "value": 2, "label": "VNPT-AS-VN VNPT Corp \u2192 VN", "group": "Fortra GoAnywhere MFT"}, {"source": 2, "target": 51, "value": 1, "label": "Fortra GoAnywhere MFT \u2192 XMISSION", "group": "Fortra GoAnywhere MFT"}, {"source": 51, "target": 84, "value": 1, "label": "XMISSION \u2192 US", "group": "Fortra GoAnywhere MFT"}, {"source": 3, "target": 52, "value": 1, "label": "Oracle E-Business Suite \u2192 ASNET", "group": "Oracle E-Business Suite"}, {"source": 52, "target": 84, "value": 1, "label": "ASNET \u2192 US", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 53, "value": 1, "label": "Oracle E-Business Suite \u2192 CHIESI-AS", "group": "Oracle E-Business Suite"}, {"source": 53, "target": 103, "value": 1, "label": "CHIESI-AS \u2192 IT", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 16, "value": 1, "label": "Oracle E-Business Suite \u2192 CONTABO", "group": "Oracle E-Business Suite"}, {"source": 16, "target": 89, "value": 1, "label": "CONTABO \u2192 DE", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 17, "value": 1, "label": "Oracle E-Business Suite \u2192 DATAHOME S.A.", "group": "Oracle E-Business Suite"}, {"source": 17, "target": 90, "value": 1, "label": "DATAHOME S.A. \u2192 PA", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 54, "value": 1, "label": "Oracle E-Business Suite \u2192 GIGAHOST", "group": "Oracle E-Business Suite"}, {"source": 54, "target": 104, "value": 1, "label": "GIGAHOST \u2192 NO", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 55, "value": 1, "label": "Oracle E-Business Suite \u2192 HETZNER-AS", "group": "Oracle E-Business Suite"}, {"source": 55, "target": 89, "value": 1, "label": "HETZNER-AS \u2192 DE", "group": "Oracle E-Business Suite"}, {"source": 3, "target": 56, "value": 1, "label": "Oracle E-Business Suite \u2192 RELIABLESITE", "group": "Oracle E-Business Suite"}, {"source": 56, "target": 84, "value": 1, "label": "RELIABLESITE \u2192 US", "group": "Oracle E-Business Suite"}, {"source": 4, "target": 27, "value": 2, "label": "PaperCut MF/NG \u2192 AMAZON-02", "group": "PaperCut MF/NG"}, {"source": 27, "target": 84, "value": 2, "label": "AMAZON-02 \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 57, "value": 2, "label": "PaperCut MF/NG \u2192 AS-GLOBALTELEHOST", "group": "PaperCut MF/NG"}, {"source": 57, "target": 84, "value": 2, "label": "AS-GLOBALTELEHOST \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 52, "value": 1, "label": "PaperCut MF/NG \u2192 ASNET", "group": "PaperCut MF/NG"}, {"source": 52, "target": 84, "value": 1, "label": "ASNET \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 33, "value": 1, "label": "PaperCut MF/NG \u2192 DATACAMPUS", "group": "PaperCut MF/NG"}, {"source": 33, "target": 96, "value": 1, "label": "DATACAMPUS \u2192 HK", "group": "PaperCut MF/NG"}, {"source": 4, "target": 35, "value": 1, "label": "PaperCut MF/NG \u2192 GREENFLOID-AS", "group": "PaperCut MF/NG"}, {"source": 35, "target": 84, "value": 1, "label": "GREENFLOID-AS \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 55, "value": 1, "label": "PaperCut MF/NG \u2192 HETZNER-AS", "group": "PaperCut MF/NG"}, {"source": 55, "target": 89, "value": 1, "label": "HETZNER-AS \u2192 DE", "group": "PaperCut MF/NG"}, {"source": 4, "target": 58, "value": 1, "label": "PaperCut MF/NG \u2192 HEXTET", "group": "PaperCut MF/NG"}, {"source": 58, "target": 93, "value": 1, "label": "HEXTET \u2192 CA", "group": "PaperCut MF/NG"}, {"source": 4, "target": 59, "value": 1, "label": "PaperCut MF/NG \u2192 Host-Africa-AS", "group": "PaperCut MF/NG"}, {"source": 59, "target": 105, "value": 1, "label": "Host-Africa-AS \u2192 ZA", "group": "PaperCut MF/NG"}, {"source": 4, "target": 60, "value": 1, "label": "PaperCut MF/NG \u2192 KREZ999AS", "group": "PaperCut MF/NG"}, {"source": 60, "target": 83, "value": 1, "label": "KREZ999AS \u2192 BG", "group": "PaperCut MF/NG"}, {"source": 4, "target": 40, "value": 1, "label": "PaperCut MF/NG \u2192 M247", "group": "PaperCut MF/NG"}, {"source": 40, "target": 99, "value": 1, "label": "M247 \u2192 RO", "group": "PaperCut MF/NG"}, {"source": 4, "target": 61, "value": 1, "label": "PaperCut MF/NG \u2192 NETWAVE-AS-AP", "group": "PaperCut MF/NG"}, {"source": 61, "target": 84, "value": 1, "label": "NETWAVE-AS-AP \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 62, "value": 1, "label": "PaperCut MF/NG \u2192 NOVOSERVE-AS", "group": "PaperCut MF/NG"}, {"source": 62, "target": 85, "value": 1, "label": "NOVOSERVE-AS \u2192 NL", "group": "PaperCut MF/NG"}, {"source": 4, "target": 42, "value": 1, "label": "PaperCut MF/NG \u2192 OVH", "group": "PaperCut MF/NG"}, {"source": 42, "target": 100, "value": 1, "label": "OVH \u2192 FR", "group": "PaperCut MF/NG"}, {"source": 4, "target": 63, "value": 1, "label": "PaperCut MF/NG \u2192 SHARP-ASN", "group": "PaperCut MF/NG"}, {"source": 63, "target": 84, "value": 1, "label": "SHARP-ASN \u2192 US", "group": "PaperCut MF/NG"}, {"source": 4, "target": 64, "value": 1, "label": "PaperCut MF/NG \u2192 SS-NET", "group": "PaperCut MF/NG"}, {"source": 64, "target": 83, "value": 1, "label": "SS-NET \u2192 BG", "group": "PaperCut MF/NG"}, {"source": 5, "target": 28, "value": 5, "label": "Progress MOVEit Transfer \u2192 AS-ALVIVA", "group": "Progress MOVEit Transfer"}, {"source": 28, "target": 91, "value": 5, "label": "AS-ALVIVA \u2192 SC", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 7, "value": 3, "label": "Progress MOVEit Transfer \u2192 AS-COLOCROSSING", "group": "Progress MOVEit Transfer"}, {"source": 7, "target": 84, "value": 3, "label": "AS-COLOCROSSING \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 65, "value": 3, "label": "Progress MOVEit Transfer \u2192 CLOUVIDER Clouvider - Global ASN", "group": "Progress MOVEit Transfer"}, {"source": 65, "target": 95, "value": 3, "label": "CLOUVIDER Clouvider - Global ASN \u2192 GB", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 8, "value": 3, "label": "Progress MOVEit Transfer \u2192 CROWNCLOUD", "group": "Progress MOVEit Transfer"}, {"source": 8, "target": 81, "value": 3, "label": "CROWNCLOUD \u2192 AU", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 33, "value": 2, "label": "Progress MOVEit Transfer \u2192 DATACAMPUS", "group": "Progress MOVEit Transfer"}, {"source": 33, "target": 96, "value": 2, "label": "DATACAMPUS \u2192 HK", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 66, "value": 1, "label": "Progress MOVEit Transfer \u2192 DELTAHOST-AS", "group": "Progress MOVEit Transfer"}, {"source": 66, "target": 98, "value": 1, "label": "DELTAHOST-AS \u2192 UA", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 67, "value": 1, "label": "Progress MOVEit Transfer \u2192 DELTAHOST-KYIV", "group": "Progress MOVEit Transfer"}, {"source": 67, "target": 98, "value": 1, "label": "DELTAHOST-KYIV \u2192 UA", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 18, "value": 2, "label": "Progress MOVEit Transfer \u2192 DIGITALOCEAN-ASN", "group": "Progress MOVEit Transfer"}, {"source": 18, "target": 84, "value": 2, "label": "DIGITALOCEAN-ASN \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 68, "value": 1, "label": "Progress MOVEit Transfer \u2192 FLYSERVERS-ASN", "group": "Progress MOVEit Transfer"}, {"source": 68, "target": 90, "value": 1, "label": "FLYSERVERS-ASN \u2192 PA", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 9, "value": 1, "label": "Progress MOVEit Transfer \u2192 GHOST", "group": "Progress MOVEit Transfer"}, {"source": 9, "target": 82, "value": 1, "label": "GHOST \u2192 LU", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 69, "value": 2, "label": "Progress MOVEit Transfer \u2192 GLOBALCOMPASS", "group": "Progress MOVEit Transfer"}, {"source": 69, "target": 84, "value": 2, "label": "GLOBALCOMPASS \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 70, "value": 5, "label": "Progress MOVEit Transfer \u2192 GLOBALLAYER", "group": "Progress MOVEit Transfer"}, {"source": 70, "target": 85, "value": 5, "label": "GLOBALLAYER \u2192 NL", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 19, "value": 3, "label": "Progress MOVEit Transfer \u2192 HOSTING-SOLUTIONS", "group": "Progress MOVEit Transfer"}, {"source": 19, "target": 84, "value": 3, "label": "HOSTING-SOLUTIONS \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 71, "value": 3, "label": "Progress MOVEit Transfer \u2192 HOSTKEY-AS", "group": "Progress MOVEit Transfer"}, {"source": 71, "target": 85, "value": 3, "label": "HOSTKEY-AS \u2192 NL", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 10, "value": 9, "label": "Progress MOVEit Transfer \u2192 Hostzealot", "group": "Progress MOVEit Transfer"}, {"source": 10, "target": 83, "value": 9, "label": "Hostzealot \u2192 BG", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 21, "value": 5, "label": "Progress MOVEit Transfer \u2192 INOVARE-AS str. Uzinelor 21 of. 37", "group": "Progress MOVEit Transfer"}, {"source": 21, "target": 86, "value": 5, "label": "INOVARE-AS str. Uzinelor 21 of. 37 \u2192 MD", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 39, "value": 1, "label": "Progress MOVEit Transfer \u2192 ITLDC-EU", "group": "Progress MOVEit Transfer"}, {"source": 39, "target": 84, "value": 1, "label": "ITLDC-EU \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 72, "value": 1, "label": "Progress MOVEit Transfer \u2192 LAYER7-NETWORKS-", "group": "Progress MOVEit Transfer"}, {"source": 72, "target": 89, "value": 1, "label": "LAYER7-NETWORKS- \u2192 DE", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 42, "value": 2, "label": "Progress MOVEit Transfer \u2192 OVH", "group": "Progress MOVEit Transfer"}, {"source": 42, "target": 100, "value": 2, "label": "OVH \u2192 FR", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 56, "value": 2, "label": "Progress MOVEit Transfer \u2192 RELIABLESITE", "group": "Progress MOVEit Transfer"}, {"source": 56, "target": 84, "value": 2, "label": "RELIABLESITE \u2192 US", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 24, "value": 2, "label": "Progress MOVEit Transfer \u2192 SERVER-MANIA", "group": "Progress MOVEit Transfer"}, {"source": 24, "target": 93, "value": 2, "label": "SERVER-MANIA \u2192 CA", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 44, "value": 2, "label": "Progress MOVEit Transfer \u2192 SOLLUTIUM-NL", "group": "Progress MOVEit Transfer"}, {"source": 44, "target": 101, "value": 2, "label": "SOLLUTIUM-NL \u2192 PL", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 73, "value": 1, "label": "Progress MOVEit Transfer \u2192 SONICASN", "group": "Progress MOVEit Transfer"}, {"source": 73, "target": 106, "value": 1, "label": "SONICASN \u2192 LB", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 45, "value": 4, "label": "Progress MOVEit Transfer \u2192 THCPROJECTS", "group": "Progress MOVEit Transfer"}, {"source": 45, "target": 99, "value": 4, "label": "THCPROJECTS \u2192 RO", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 46, "value": 1, "label": "Progress MOVEit Transfer \u2192 THE-HOSTING", "group": "Progress MOVEit Transfer"}, {"source": 46, "target": 86, "value": 1, "label": "THE-HOSTING \u2192 MD", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 12, "value": 6, "label": "Progress MOVEit Transfer \u2192 WORLDSTREAM", "group": "Progress MOVEit Transfer"}, {"source": 12, "target": 85, "value": 6, "label": "WORLDSTREAM \u2192 NL", "group": "Progress MOVEit Transfer"}, {"source": 5, "target": 74, "value": 2, "label": "Progress MOVEit Transfer \u2192 YURTEH-AS", "group": "Progress MOVEit Transfer"}, {"source": 74, "target": 98, "value": 2, "label": "YURTEH-AS \u2192 UA", "group": "Progress MOVEit Transfer"}, {"source": 6, "target": 75, "value": 1, "label": "SolarWinds Serv-U \u2192 ACI-1", "group": "SolarWinds Serv-U"}, {"source": 75, "target": 93, "value": 1, "label": "ACI-1 \u2192 CA", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 76, "value": 1, "label": "SolarWinds Serv-U \u2192 ASN-CXA-ALL-CCI-22773-RDC", "group": "SolarWinds Serv-U"}, {"source": 76, "target": 84, "value": 1, "label": "ASN-CXA-ALL-CCI-22773-RDC \u2192 US", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 71, "value": 1, "label": "SolarWinds Serv-U \u2192 HOSTKEY-AS", "group": "SolarWinds Serv-U"}, {"source": 71, "target": 85, "value": 1, "label": "HOSTKEY-AS \u2192 NL", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 77, "value": 1, "label": "SolarWinds Serv-U \u2192 IT7NET", "group": "SolarWinds Serv-U"}, {"source": 77, "target": 93, "value": 1, "label": "IT7NET \u2192 CA", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 72, "value": 2, "label": "SolarWinds Serv-U \u2192 LAYER7-NETWORKS-", "group": "SolarWinds Serv-U"}, {"source": 72, "target": 89, "value": 2, "label": "LAYER7-NETWORKS- \u2192 DE", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 78, "value": 1, "label": "SolarWinds Serv-U \u2192 TWC-11427-TEXAS", "group": "SolarWinds Serv-U"}, {"source": 78, "target": 84, "value": 1, "label": "TWC-11427-TEXAS \u2192 US", "group": "SolarWinds Serv-U"}, {"source": 6, "target": 79, "value": 1, "label": "SolarWinds Serv-U \u2192 VIANET INC 5690", "group": "SolarWinds Serv-U"}, {"source": 79, "target": 93, "value": 1, "label": "VIANET INC 5690 \u2192 CA", "group": "SolarWinds Serv-U"}];
 
-// Build node arrays
-const nodeLabels = nodes;
-const nodeColors = nodes.map((n,i)=> i < 6 ? '#0ea5e9' : (i < 79 ? '#a78bfa' : '#34d399'));
+// Node categorization helpers
+const isCampaign = (i) => i >= 0 && i <= 6;
+const isASN = (i) => i >= 7 && i <= 79;
+const isCountry = (i) => i >= 80;
 
-// Helper to filter links by campaign
-function filteredLinks(camp) {
-  if (camp === "All") return linksAll;
-  return linksAll.filter(l => l.group === camp);
+// Color logic
+const nodeColors = nodes.map((n,i)=> isCampaign(i) ? '#0ea5e9' : (isASN(i) ? '#a78bfa' : '#34d399'));
+
+// State for filters
+// Storing IDs (Indices) in sets. Empty set = "Select All" (Show everything).
+let selectedCampaigns = new Set(); 
+let selectedASNs = new Set();
+
+// --- INITIALIZATION ---
+
+function init() {
+  // Build Campaign Checkboxes
+  const campListEl = document.getElementById('list-campaign');
+  nodes.forEach((label, idx) => {
+    if (isCampaign(idx)) {
+      campListEl.appendChild(createCheckboxItem(idx, label, 'campaign'));
+    }
+  });
+
+  // Build ASN Checkboxes
+  const asnListEl = document.getElementById('list-asn');
+  nodes.forEach((label, idx) => {
+    if (isASN(idx)) {
+      asnListEl.appendChild(createCheckboxItem(idx, label, 'asn'));
+    }
+  });
+
+  updateChart();
 }
 
-// Build sankey data from links
-function sankeyFromLinks(links) {
-  return {
+function createCheckboxItem(id, label, type) {
+  const div = document.createElement('div');
+  div.className = 'list-item';
+  div.setAttribute('data-name', label.toLowerCase());
+  
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.value = id;
+  checkbox.addEventListener('change', (e) => {
+    const set = type === 'campaign' ? selectedCampaigns : selectedASNs;
+    if (e.target.checked) set.add(parseInt(e.target.value));
+    else set.delete(parseInt(e.target.value));
+    updateChart();
+  });
+
+  const span = document.createElement('span');
+  span.textContent = label;
+
+  div.appendChild(checkbox);
+  div.appendChild(span);
+  
+  // Click row to toggle
+  div.addEventListener('click', (e) => {
+    if (e.target !== checkbox) checkbox.click();
+  });
+  
+  return div;
+}
+
+// --- LOGIC ---
+
+// Filter Function
+function getFilteredLinks() {
+  // Logic: 
+  // 1. Filter by Campaign (if any selected).
+  // 2. Filter by ASN (if any selected) -> but ensure we keep the flow intact.
+  
+  const hasCampFilter = selectedCampaigns.size > 0;
+  const hasAsnFilter = selectedASNs.size > 0;
+
+  return linksAll.filter(link => {
+    // Check Campaign Match (using 'group' string, mapped back to campaign logic)
+    // Note: The data source indices 0-6 correspond to campaignsList
+    const linkCampName = link.group;
+    const linkCampIndex = campaignsList.indexOf(linkCampName); 
+    
+    const campMatch = !hasCampFilter || selectedCampaigns.has(linkCampIndex);
+
+    // If campaign doesn't match, drop it immediately
+    if (!campMatch) return false;
+
+    // Check ASN Match
+    // Link structure is either Campaign->ASN or ASN->Country
+    // We need to check if the ASN involved in this link is selected
+    let asnMatch = true;
+    if (hasAsnFilter) {
+      const src = link.source;
+      const tgt = link.target;
+      
+      // If Target is ASN (Camp -> ASN link)
+      if (isASN(tgt)) {
+        if (!selectedASNs.has(tgt)) asnMatch = false;
+      }
+      // If Source is ASN (ASN -> Country link)
+      else if (isASN(src)) {
+        if (!selectedASNs.has(src)) asnMatch = false;
+      }
+    }
+
+    return asnMatch;
+  });
+}
+
+function updateChart() {
+  const filtered = getFilteredLinks();
+  
+  document.getElementById('link-count').textContent = filtered.length;
+  
+  // Status text
+  let status = [];
+  if (selectedCampaigns.size > 0) status.push(`${selectedCampaigns.size} Campaigns`);
+  if (selectedASNs.size > 0) status.push(`${selectedASNs.size} ASNs`);
+  document.getElementById('filter-status').textContent = status.length > 0 ? `(Filters: ${status.join(', ')})` : "(Showing All)";
+
+  const data = {
     type: 'sankey',
     arrangement: 'snap',
     node: {
-      label: nodeLabels,
+      label: nodes,
       color: nodeColors,
-      pad: 20,
-      thickness: 18,
-      line: { color: 'rgba(255,255,255,0.08)', width: 1 }
+      pad: 15,
+      thickness: 15,
+      line: { color: 'rgba(255,255,255,0.05)', width: 1 }
     },
     link: {
-      source: links.map(l => l.source),
-      target: links.map(l => l.target),
-      value:  links.map(l => l.value),
-      hovertemplate: links.map(l => l.label) ,
+      source: filtered.map(l => l.source),
+      target: filtered.map(l => l.target),
+      value:  filtered.map(l => l.value),
+      hovertemplate: filtered.map(l => `<b>${l.label}</b><br>Value: ${l.value}<extra></extra>`) 
     }
   };
+
+  const layout = {
+    font: { size: 12, color: "#9ca3af" },
+    paper_bgcolor: '#0b0f14',
+    plot_bgcolor: '#0b0f14',
+    margin: { l: 10, r: 10, t: 30, b: 10 },
+    hoverlabel: { bgcolor: '#1f2937', bordercolor: '#374151', font: {color: '#fff'} }
+  };
+
+  Plotly.react('chart', [data], layout, {displayModeBar: false, responsive: true});
 }
 
-const layout = {
-  title: '',
-  font: { size: 12 },
-  paper_bgcolor: '#0b0f14',
-  plot_bgcolor: '#0b0f14',
-  margin: { l: 20, r: 20, t: 10, b: 20 },
-  hoverlabel: { bgcolor: '#111827', bordercolor: '#374151' }
-};
+// --- UTILS ---
 
-const chart = document.getElementById('chart');
-const select = document.getElementById('campaign');
-const linkCount = document.getElementById('linkCount');
-const resetBtn = document.getElementById('reset');
+// Search filter
+function filterList(type) {
+  const input = document.getElementById(`search-${type}`);
+  const filter = input.value.toLowerCase();
+  const list = document.getElementById(`list-${type}`);
+  const items = list.getElementsByClassName('list-item');
 
-// Populate dropdown
-campaigns.forEach(c => {
-  const opt = document.createElement('option');
-  opt.value = c; opt.textContent = c;
-  select.appendChild(opt);
-});
+  for (let i = 0; i < items.length; i++) {
+    const txt = items[i].getAttribute('data-name');
+    items[i].style.display = txt.includes(filter) ? "" : "none";
+  }
+}
 
-// Initial render (All)
-let currentLinks = filteredLinks("All");
-Plotly.newPlot(chart, [sankeyFromLinks(currentLinks)], layout, {displaylogo:false, responsive:true});
-linkCount.textContent = currentLinks.length.toString();
+// Select/Deselect All
+function toggleAll(type, selectAll) {
+  const list = document.getElementById(`list-${type}`);
+  const boxes = list.querySelectorAll('input[type="checkbox"]');
+  const set = type === 'campaign' ? selectedCampaigns : selectedASNs;
+  
+  // Update UI and Set
+  boxes.forEach(box => {
+    // Only toggle visible items if search is active? 
+    // Usually "Select All" applies to visible items in a filtered list.
+    if (box.parentElement.style.display !== 'none') {
+        box.checked = selectAll;
+        const val = parseInt(box.value);
+        if (selectAll) set.add(val);
+        else set.delete(val);
+    }
+  });
+  
+  updateChart();
+}
 
-// Handle filter change
-select.addEventListener('change', () => {
-  currentLinks = filteredLinks(select.value);
-  Plotly.react(chart, [sankeyFromLinks(currentLinks)], layout, {displaylogo:false, responsive:true});
-  linkCount.textContent = currentLinks.length.toString();
-});
+function resetView() {
+    // Reset Plotly zoom
+    const gd = document.getElementById('chart');
+    Plotly.relayout(gd, {
+        'xaxis.autorange': true,
+        'yaxis.autorange': true
+    });
+}
 
-// Reset camera/view
-resetBtn.addEventListener('click', () => {
-  Plotly.Plots.resize(chart);
-});
+// Run
+init();
+window.addEventListener('resize', () => Plotly.Plots.resize(document.getElementById('chart')));
 
-// Resize on window changes
-window.addEventListener('resize', () => Plotly.Plots.resize(chart));
 </script>
 </body>
 </html>
-
-{% endraw %}
-
